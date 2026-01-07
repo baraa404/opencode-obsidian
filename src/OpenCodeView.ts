@@ -123,7 +123,6 @@ export class OpenCodeView extends ItemView {
   private renderRunningState(): void {
     this.contentEl.empty();
 
-    // Create header with controls
     const headerEl = this.contentEl.createDiv({ cls: "opencode-header" });
 
     const titleSection = headerEl.createDiv({ cls: "opencode-header-title" });
@@ -133,7 +132,6 @@ export class OpenCodeView extends ItemView {
 
     const actionsEl = headerEl.createDiv({ cls: "opencode-header-actions" });
 
-    // Reload button
     const reloadButton = actionsEl.createEl("button", {
       attr: { "aria-label": "Reload" },
     });
@@ -142,16 +140,6 @@ export class OpenCodeView extends ItemView {
       this.reloadIframe();
     });
 
-    // Open in browser button
-    const externalButton = actionsEl.createEl("button", {
-      attr: { "aria-label": "Open in browser" },
-    });
-    setIcon(externalButton, "external-link");
-    externalButton.addEventListener("click", () => {
-      window.open(this.plugin.getServerUrl(), "_blank");
-    });
-
-    // Stop button
     const stopButton = actionsEl.createEl("button", {
       attr: { "aria-label": "Stop server" },
     });
@@ -160,7 +148,6 @@ export class OpenCodeView extends ItemView {
       this.plugin.stopServer();
     });
 
-    // Create iframe container
     const iframeContainer = this.contentEl.createDiv({
       cls: "opencode-iframe-container",
     });
@@ -174,7 +161,6 @@ export class OpenCodeView extends ItemView {
       },
     });
 
-    // Handle iframe load errors
     this.iframeEl.addEventListener("error", () => {
       console.error("Failed to load OpenCode iframe");
     });
@@ -192,7 +178,6 @@ export class OpenCodeView extends ItemView {
 
     statusContainer.createEl("h3", { text: "Failed to start OpenCode" });
     
-    // Display specific error message if available
     const errorMessage = this.plugin.getLastError();
     if (errorMessage) {
       statusContainer.createEl("p", {

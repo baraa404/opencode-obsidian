@@ -7,23 +7,19 @@ import { registerOpenCodeIcons, OPENCODE_ICON_NAME } from "./icons";
 
 export default class OpenCodePlugin extends Plugin {
   settings: OpenCodeSettings = DEFAULT_SETTINGS;
-  private processManager: ProcessManager | null = null;
+  private processManager: ProcessManager; 
   private stateChangeCallbacks: Array<(state: ProcessState) => void> = [];
 
   async onload(): Promise<void> {
     console.log("Loading OpenCode plugin");
 
-    // Register custom icons
     registerOpenCodeIcons();
 
     await this.loadSettings();
 
-    // Get the vault directory path to pass to OpenCode
     const vaultPath = this.getVaultPath();
     const projectDirectory = this.getProjectDirectory();
 
-    // Initialize process manager with vault as the working directory
-    // and either the configured project directory or vault as the project
     this.processManager = new ProcessManager(
       this.settings,
       vaultPath,
@@ -33,15 +29,13 @@ export default class OpenCodePlugin extends Plugin {
 
     console.log("[OpenCode] Configured with project directory:", projectDirectory);
 
-    // Register the OpenCode view
     this.registerView(OPENCODE_VIEW_TYPE, (leaf) => new OpenCodeView(leaf, this));
+    this.addSettingTab(new OpenCodeSettingTab(this.app, this));
 
-    // Add ribbon icon
     this.addRibbonIcon(OPENCODE_ICON_NAME, "OpenCode", () => {
       this.activateView();
     });
 
-    // Add command to toggle view
     this.addCommand({
       id: "toggle-opencode-view",
       name: "Toggle OpenCode panel",
@@ -56,7 +50,6 @@ export default class OpenCodePlugin extends Plugin {
       ],
     });
 
-    // Add command to start server
     this.addCommand({
       id: "start-opencode-server",
       name: "Start OpenCode server",
@@ -65,7 +58,6 @@ export default class OpenCodePlugin extends Plugin {
       },
     });
 
-    // Add command to stop server
     this.addCommand({
       id: "stop-opencode-server",
       name: "Stop OpenCode server",
@@ -74,10 +66,6 @@ export default class OpenCodePlugin extends Plugin {
       },
     });
 
-    // Register settings tab
-    this.addSettingTab(new OpenCodeSettingTab(this.app, this));
-
-    // Auto-start if enabled
     if (this.settings.autoStart) {
       this.app.workspace.onLayoutReady(async () => {
         await this.startServer();
@@ -88,15 +76,8 @@ export default class OpenCodePlugin extends Plugin {
   }
 
   async onunload(): Promise<void> {
-    console.log("Unloading OpenCode plugin");
-
-    // Stop the server
     this.stopServer();
-
-    // Detach all views
     this.app.workspace.detachLeavesOfType(OPENCODE_VIEW_TYPE);
-
-    console.log("OpenCode plugin unloaded");
   }
 
   async loadSettings(): Promise<void> {
@@ -105,10 +86,7 @@ export default class OpenCodePlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
-    // Update process manager with new settings
-    if (this.processManager) {
-      this.processManager.updateSettings(this.settings);
-    }
+    this.processManager.updateSettings(this.settings);
   }
 
   // Update project directory and restart server if running
@@ -116,14 +94,12 @@ export default class OpenCodePlugin extends Plugin {
     this.settings.projectDirectory = directory;
     await this.saveData(this.settings);
 
-    if (this.processManager) {
-      this.processManager.updateProjectDirectory(this.getProjectDirectory());
+    this.processManager.updateProjectDirectory(this.getProjectDirectory());
 
-      // Restart server if it's currently running
-      if (this.getProcessState() === "running") {
-        this.stopServer();
-        await this.startServer();
-      }
+    // Restart server if it's currently running
+    if (this.getProcessState() === "running") {
+      this.stopServer();
+      await this.startServer();
     }
   }
 
@@ -170,13 +146,7 @@ export default class OpenCodePlugin extends Plugin {
     }
   }
 
-  // Start the OpenCode server
   async startServer(): Promise<boolean> {
-    if (!this.processManager) {
-      new Notice("OpenCode: Process manager not initialized");
-      return false;
-    }
-
     const success = await this.processManager.start();
     if (success) {
       new Notice("OpenCode server started");
@@ -184,30 +154,23 @@ export default class OpenCodePlugin extends Plugin {
     return success;
   }
 
-  // Stop the OpenCode server
   stopServer(): void {
-    if (this.processManager) {
-      this.processManager.stop();
-      new Notice("OpenCode server stopped");
-    }
+    this.processManager.stop();
+    new Notice("OpenCode server stopped");
   }
 
-  // Get the current process state
   getProcessState(): ProcessState {
     return this.processManager?.getState() ?? "stopped";
   }
 
-  // Get the last error message from the process manager
   getLastError(): string | null {
-    return this.processManager?.getLastError() ?? null;
+    return this.processManager.getLastError() ?? null;
   }
 
-  // Get the server URL
   getServerUrl(): string {
-    return this.processManager?.getUrl() ?? `http://127.0.0.1:${this.settings.port}`;
+    return this.processManager.getUrl() ?? `http://127.0.0.1:${this.settings.port}`;
   }
 
-  // Subscribe to process state changes, returns unsubscribe function
   onProcessStateChange(callback: (state: ProcessState) => void): () => void {
     this.stateChangeCallbacks.push(callback);
     return () => {
@@ -218,14 +181,12 @@ export default class OpenCodePlugin extends Plugin {
     };
   }
 
-  // Notify all subscribers of state change
   private notifyStateChange(state: ProcessState): void {
     for (const callback of this.stateChangeCallbacks) {
       callback(state);
     }
   }
 
-  // Get the vault path - this is the root directory of the Obsidian vault
   private getVaultPath(): string {
     const adapter = this.app.vault.adapter as any;
     const vaultPath = adapter.basePath || "";
@@ -235,7 +196,6 @@ export default class OpenCodePlugin extends Plugin {
     return vaultPath;
   }
 
-  // Get the project directory - uses the configured setting if set, otherwise vault path
   getProjectDirectory(): string {
     if (this.settings.projectDirectory) {
       return this.settings.projectDirectory;

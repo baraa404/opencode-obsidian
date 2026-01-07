@@ -158,13 +158,6 @@ var OpenCodeView = class extends import_obsidian2.ItemView {
     reloadButton.addEventListener("click", () => {
       this.reloadIframe();
     });
-    const externalButton = actionsEl.createEl("button", {
-      attr: { "aria-label": "Open in browser" }
-    });
-    (0, import_obsidian2.setIcon)(externalButton, "external-link");
-    externalButton.addEventListener("click", () => {
-      window.open(this.plugin.getServerUrl(), "_blank");
-    });
     const stopButton = actionsEl.createEl("button", {
       attr: { "aria-label": "Stop server" }
     });
@@ -585,7 +578,6 @@ var OpenCodePlugin = class extends import_obsidian4.Plugin {
   constructor() {
     super(...arguments);
     this.settings = DEFAULT_SETTINGS;
-    this.processManager = null;
     this.stateChangeCallbacks = [];
   }
   async onload() {
@@ -602,6 +594,7 @@ var OpenCodePlugin = class extends import_obsidian4.Plugin {
     );
     console.log("[OpenCode] Configured with project directory:", projectDirectory);
     this.registerView(OPENCODE_VIEW_TYPE, (leaf) => new OpenCodeView(leaf, this));
+    this.addSettingTab(new OpenCodeSettingTab(this.app, this));
     this.addRibbonIcon(OPENCODE_ICON_NAME, "OpenCode", () => {
       this.activateView();
     });
@@ -632,7 +625,6 @@ var OpenCodePlugin = class extends import_obsidian4.Plugin {
         this.stopServer();
       }
     });
-    this.addSettingTab(new OpenCodeSettingTab(this.app, this));
     if (this.settings.autoStart) {
       this.app.workspace.onLayoutReady(async () => {
         await this.startServer();
@@ -641,30 +633,24 @@ var OpenCodePlugin = class extends import_obsidian4.Plugin {
     console.log("OpenCode plugin loaded");
   }
   async onunload() {
-    console.log("Unloading OpenCode plugin");
     this.stopServer();
     this.app.workspace.detachLeavesOfType(OPENCODE_VIEW_TYPE);
-    console.log("OpenCode plugin unloaded");
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
   async saveSettings() {
     await this.saveData(this.settings);
-    if (this.processManager) {
-      this.processManager.updateSettings(this.settings);
-    }
+    this.processManager.updateSettings(this.settings);
   }
   // Update project directory and restart server if running
   async updateProjectDirectory(directory) {
     this.settings.projectDirectory = directory;
     await this.saveData(this.settings);
-    if (this.processManager) {
-      this.processManager.updateProjectDirectory(this.getProjectDirectory());
-      if (this.getProcessState() === "running") {
-        this.stopServer();
-        await this.startServer();
-      }
+    this.processManager.updateProjectDirectory(this.getProjectDirectory());
+    if (this.getProcessState() === "running") {
+      this.stopServer();
+      await this.startServer();
     }
   }
   // Get existing view leaf if any
@@ -702,41 +688,29 @@ var OpenCodePlugin = class extends import_obsidian4.Plugin {
       await this.activateView();
     }
   }
-  // Start the OpenCode server
   async startServer() {
-    if (!this.processManager) {
-      new import_obsidian4.Notice("OpenCode: Process manager not initialized");
-      return false;
-    }
     const success = await this.processManager.start();
     if (success) {
       new import_obsidian4.Notice("OpenCode server started");
     }
     return success;
   }
-  // Stop the OpenCode server
   stopServer() {
-    if (this.processManager) {
-      this.processManager.stop();
-      new import_obsidian4.Notice("OpenCode server stopped");
-    }
+    this.processManager.stop();
+    new import_obsidian4.Notice("OpenCode server stopped");
   }
-  // Get the current process state
   getProcessState() {
     var _a, _b;
     return (_b = (_a = this.processManager) == null ? void 0 : _a.getState()) != null ? _b : "stopped";
   }
-  // Get the last error message from the process manager
   getLastError() {
-    var _a, _b;
-    return (_b = (_a = this.processManager) == null ? void 0 : _a.getLastError()) != null ? _b : null;
+    var _a;
+    return (_a = this.processManager.getLastError()) != null ? _a : null;
   }
-  // Get the server URL
   getServerUrl() {
-    var _a, _b;
-    return (_b = (_a = this.processManager) == null ? void 0 : _a.getUrl()) != null ? _b : `http://127.0.0.1:${this.settings.port}`;
+    var _a;
+    return (_a = this.processManager.getUrl()) != null ? _a : `http://127.0.0.1:${this.settings.port}`;
   }
-  // Subscribe to process state changes, returns unsubscribe function
   onProcessStateChange(callback) {
     this.stateChangeCallbacks.push(callback);
     return () => {
@@ -746,13 +720,11 @@ var OpenCodePlugin = class extends import_obsidian4.Plugin {
       }
     };
   }
-  // Notify all subscribers of state change
   notifyStateChange(state) {
     for (const callback of this.stateChangeCallbacks) {
       callback(state);
     }
   }
-  // Get the vault path - this is the root directory of the Obsidian vault
   getVaultPath() {
     const adapter = this.app.vault.adapter;
     const vaultPath = adapter.basePath || "";
@@ -761,7 +733,6 @@ var OpenCodePlugin = class extends import_obsidian4.Plugin {
     }
     return vaultPath;
   }
-  // Get the project directory - uses the configured setting if set, otherwise vault path
   getProjectDirectory() {
     if (this.settings.projectDirectory) {
       return this.settings.projectDirectory;

@@ -25,10 +25,7 @@ export class OpenCodeSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-
     containerEl.createEl("h2", { text: "OpenCode Settings" });
-
-    // Server settings section
     containerEl.createEl("h3", { text: "Server Configuration" });
 
     new Setting(containerEl)
@@ -95,7 +92,6 @@ export class OpenCodeSettingTab extends PluginSettingTab {
           })
       );
 
-    // Behavior settings section
     containerEl.createEl("h3", { text: "Behavior" });
 
     new Setting(containerEl)
@@ -112,7 +108,6 @@ export class OpenCodeSettingTab extends PluginSettingTab {
           })
       );
 
-    // Server status section
     containerEl.createEl("h3", { text: "Server Status" });
 
     const statusContainer = containerEl.createDiv({ cls: "opencode-settings-status" });
@@ -134,10 +129,8 @@ export class OpenCodeSettingTab extends PluginSettingTab {
       return;
     }
 
-    // Expand tilde for validation
     const expanded = expandTilde(trimmed);
 
-    // Validate path exists and is a directory
     try {
       if (!existsSync(expanded)) {
         new Notice("Project directory does not exist");
@@ -153,7 +146,6 @@ export class OpenCodeSettingTab extends PluginSettingTab {
       return;
     }
 
-    // Store the expanded path
     await this.plugin.updateProjectDirectory(expanded);
   }
 
@@ -195,7 +187,6 @@ export class OpenCodeSettingTab extends PluginSettingTab {
       });
     }
 
-    // Control buttons
     const buttonContainer = container.createDiv({ cls: "opencode-settings-buttons" });
 
     if (state === "stopped" || state === "error") {
