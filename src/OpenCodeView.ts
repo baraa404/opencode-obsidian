@@ -56,6 +56,10 @@ export class OpenCodeView extends ItemView {
     
     // Clean up iframe
     if (this.iframeEl) {
+      const iframeUrl = this.iframeEl.src;
+      if (iframeUrl.includes("/session/")) {
+        this.plugin.setCachedIframeUrl(iframeUrl);
+      }
       this.iframeEl.src = "about:blank";
       this.iframeEl = null;
     }
@@ -152,12 +156,13 @@ export class OpenCodeView extends ItemView {
       cls: "opencode-iframe-container",
     });
 
-    console.log("[OpenCode] Loading iframe with URL:", this.plugin.getServerUrl());
+    const iframeUrl = this.plugin.getStoredIframeUrl() ?? this.plugin.getServerUrl();
+    console.log("[OpenCode] Loading iframe with URL:", iframeUrl);
 
     this.iframeEl = iframeContainer.createEl("iframe", {
       cls: "opencode-iframe",
       attr: {
-        src: this.plugin.getServerUrl(),
+        src: iframeUrl,
         frameborder: "0",
         allow: "clipboard-read; clipboard-write",
       },
@@ -166,6 +171,26 @@ export class OpenCodeView extends ItemView {
     this.iframeEl.addEventListener("error", () => {
       console.error("Failed to load OpenCode iframe");
     });
+
+    this.iframeEl.addEventListener("focus", () => {
+      this.plugin.refreshContextForView(this);
+    });
+
+    this.iframeEl.addEventListener("pointerdown", () => {
+      this.plugin.refreshContextForView(this);
+    });
+
+    void this.plugin.ensureSessionUrl(this);
+  }
+
+  getIframeUrl(): string | null {
+    return this.iframeEl?.src ?? null;
+  }
+
+  setIframeUrl(url: string): void {
+    if (this.iframeEl && this.iframeEl.src !== url) {
+      this.iframeEl.src = url;
+    }
   }
 
   private renderErrorState(): void {

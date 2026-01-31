@@ -1,14 +1,23 @@
-import { Plugin, WorkspaceLeaf, Notice } from "obsidian";
+import { Plugin, WorkspaceLeaf, Notice, EventRef, MarkdownView } from "obsidian";
 import { OpenCodeSettings, DEFAULT_SETTINGS, OPENCODE_VIEW_TYPE } from "./types";
 import { OpenCodeView } from "./OpenCodeView";
 import { OpenCodeSettingTab } from "./SettingsTab";
 import { ProcessManager, ProcessState } from "./ProcessManager";
 import { registerOpenCodeIcons, OPENCODE_ICON_NAME } from "./icons";
+import { OpenCodeClient } from "./OpenCodeClient";
+import { WorkspaceContext } from "./WorkspaceContext";
 
 export default class OpenCodePlugin extends Plugin {
   settings: OpenCodeSettings = DEFAULT_SETTINGS;
   private processManager: ProcessManager; 
   private stateChangeCallbacks: Array<(state: ProcessState) => void> = [];
+  private openCodeClient: OpenCodeClient;
+  private workspaceContext: WorkspaceContext;
+  private cachedIframeUrl: string | null = null;
+  private lastBaseUrl: string | null = null;
+  private focusEventRef: EventRef | null = null;
+  private sidebarEventRefs: EventRef[] = [];
+  private sidebarRefreshTimer: number | null = null;
 
   async onload(): Promise<void> {
     console.log("Loading OpenCode plugin");
@@ -24,6 +33,10 @@ export default class OpenCodePlugin extends Plugin {
       projectDirectory,
       (state) => this.notifyStateChange(state)
     );
+
+    this.openCodeClient = new OpenCodeClient(this.getApiBaseUrl(), this.getServerUrl(), projectDirectory);
+    this.workspaceContext = new WorkspaceContext(this.app);
+    this.lastBaseUrl = this.getServerUrl();
 
     console.log("[OpenCode] Configured with project directory:", projectDirectory);
 
@@ -70,6 +83,14 @@ export default class OpenCodePlugin extends Plugin {
       });
     }
 
+    this.updateFocusListener();
+    this.updateSidebarListeners();
+    this.onProcessStateChange((state) => {
+      if (state === "running") {
+        void this.handleServerRunning();
+      }
+    });
+
     console.log("OpenCode plugin loaded");
   }
 
@@ -85,6 +106,9 @@ export default class OpenCodePlugin extends Plugin {
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
     this.processManager.updateSettings(this.settings);
+    this.refreshClientState();
+    this.updateFocusListener();
+    this.updateSidebarListeners();
   }
 
   // Update project directory and restart server if running
@@ -93,6 +117,7 @@ export default class OpenCodePlugin extends Plugin {
     await this.saveData(this.settings);
 
     this.processManager.updateProjectDirectory(this.getProjectDirectory());
+    this.refreshClientState();
 
     if (this.getProcessState() === "running") {
       this.stopServer();
@@ -179,6 +204,51 @@ export default class OpenCodePlugin extends Plugin {
     return this.processManager.getUrl();
   }
 
+  getApiBaseUrl(): string {
+    return `http://${this.settings.hostname}:${this.settings.port}`;
+  }
+
+  getStoredIframeUrl(): string | null {
+    return this.cachedIframeUrl;
+  }
+
+  setCachedIframeUrl(url: string | null): void {
+    this.cachedIframeUrl = url;
+  }
+
+  async ensureSessionUrl(view: OpenCodeView): Promise<void> {
+    if (this.getProcessState() !== "running") {
+      return;
+    }
+
+    const existingUrl = this.cachedIframeUrl ?? view.getIframeUrl();
+    if (existingUrl && this.openCodeClient.resolveSessionId(existingUrl)) {
+      this.cachedIframeUrl = existingUrl;
+      return;
+    }
+
+    const sessionId = await this.openCodeClient.createSession();
+    if (!sessionId) {
+      return;
+    }
+
+    const sessionUrl = this.openCodeClient.getSessionUrl(sessionId);
+    this.cachedIframeUrl = sessionUrl;
+    view.setIframeUrl(sessionUrl);
+
+    if (this.app.workspace.activeLeaf === view.leaf) {
+      await this.updateOpenCodeContext(view.leaf);
+    }
+  }
+
+  refreshContextForView(view: OpenCodeView): void {
+    if (!this.settings.injectWorkspaceContext) {
+      return;
+    }
+
+    void this.updateOpenCodeContext(view.leaf);
+  }
+
   onProcessStateChange(callback: (state: ProcessState) => void): () => void {
     this.stateChangeCallbacks.push(callback);
     return () => {
@@ -193,6 +263,149 @@ export default class OpenCodePlugin extends Plugin {
     for (const callback of this.stateChangeCallbacks) {
       callback(state);
     }
+  }
+
+  private refreshClientState(): void {
+    const nextUiBaseUrl = this.getServerUrl();
+    const nextApiBaseUrl = this.getApiBaseUrl();
+    const projectDirectory = this.getProjectDirectory();
+    this.openCodeClient.updateBaseUrl(nextApiBaseUrl, nextUiBaseUrl, projectDirectory);
+
+    if (this.lastBaseUrl && this.lastBaseUrl !== nextUiBaseUrl) {
+      this.cachedIframeUrl = null;
+    }
+
+    this.lastBaseUrl = nextUiBaseUrl;
+  }
+
+  private updateFocusListener(): void {
+    if (!this.settings.injectWorkspaceContext) {
+      if (this.focusEventRef) {
+        this.app.workspace.offref(this.focusEventRef);
+        this.focusEventRef = null;
+      }
+      return;
+    }
+
+    if (this.focusEventRef) {
+      return;
+    }
+
+    const eventRef = this.app.workspace.on("active-leaf-change", (leaf) => {
+      if (leaf?.view instanceof MarkdownView) {
+        this.workspaceContext.updateSelectionFromView(leaf.view);
+      }
+      if (leaf?.view.getViewType() === OPENCODE_VIEW_TYPE) {
+        void this.updateOpenCodeContext(leaf);
+      }
+    });
+
+    this.focusEventRef = eventRef;
+    this.registerEvent(eventRef);
+  }
+
+  private updateSidebarListeners(): void {
+    if (!this.settings.injectWorkspaceContext) {
+      this.clearSidebarListeners();
+      return;
+    }
+
+    if (this.sidebarEventRefs.length > 0) {
+      return;
+    }
+
+    const fileOpenRef = this.app.workspace.on("file-open", () => {
+      this.scheduleSidebarContextRefresh();
+    });
+    const editorChangeRef = this.app.workspace.on("editor-change", (_editor, view) => {
+      const markdownView = view instanceof MarkdownView ? view : this.app.workspace.getActiveViewOfType(MarkdownView);
+      this.workspaceContext.updateSelectionFromView(markdownView);
+      this.scheduleSidebarContextRefresh();
+    });
+
+    this.sidebarEventRefs = [fileOpenRef, editorChangeRef];
+    this.sidebarEventRefs.forEach((ref) => this.registerEvent(ref));
+  }
+
+  private clearSidebarListeners(): void {
+    for (const ref of this.sidebarEventRefs) {
+      this.app.workspace.offref(ref);
+    }
+    this.sidebarEventRefs = [];
+    if (this.sidebarRefreshTimer !== null) {
+      window.clearTimeout(this.sidebarRefreshTimer);
+      this.sidebarRefreshTimer = null;
+    }
+  }
+
+  private scheduleSidebarContextRefresh(): void {
+    const leaf = this.getVisibleSidebarOpenCodeLeaf();
+    if (!leaf) {
+      return;
+    }
+
+    if (this.sidebarRefreshTimer !== null) {
+      window.clearTimeout(this.sidebarRefreshTimer);
+    }
+
+    this.sidebarRefreshTimer = window.setTimeout(() => {
+      this.sidebarRefreshTimer = null;
+      void this.updateOpenCodeContext(leaf);
+    }, 1000);
+  }
+
+  private getVisibleSidebarOpenCodeLeaf(): WorkspaceLeaf | null {
+    const leaves = this.app.workspace.getLeavesOfType(OPENCODE_VIEW_TYPE);
+    if (leaves.length === 0) {
+      return null;
+    }
+
+    const rightSplit = this.app.workspace.rightSplit;
+    if (!rightSplit || rightSplit.collapsed) {
+      return null;
+    }
+
+    const leaf = leaves[0];
+    return leaf.getRoot() === rightSplit ? leaf : null;
+  }
+
+  private async handleServerRunning(): Promise<void> {
+    const activeLeaf = this.app.workspace.activeLeaf;
+    if (activeLeaf?.view.getViewType() === OPENCODE_VIEW_TYPE) {
+      await this.updateOpenCodeContext(activeLeaf);
+    }
+  }
+
+  private async updateOpenCodeContext(leaf: WorkspaceLeaf): Promise<void> {
+    if (!this.settings.injectWorkspaceContext) {
+      return;
+    }
+
+    if (this.getProcessState() !== "running") {
+      return;
+    }
+
+    const view = leaf.view instanceof OpenCodeView ? leaf.view : null;
+    const iframeUrl = this.cachedIframeUrl ?? view?.getIframeUrl();
+    if (!iframeUrl) {
+      return;
+    }
+
+    const sessionId = this.openCodeClient.resolveSessionId(iframeUrl);
+    if (!sessionId) {
+      return;
+    }
+
+    this.cachedIframeUrl = iframeUrl;
+
+    const openPaths = this.workspaceContext.getOpenNotePaths(this.settings.maxNotesInContext);
+    const selection = this.workspaceContext.getSelectedText(this.settings.maxSelectionLength);
+    const contextText = this.workspaceContext.formatContext(openPaths, selection);
+
+    await this.openCodeClient.updateContext({
+      sessionId,
+      contextText,
+    });
   }
 
   getProjectDirectory(): string {

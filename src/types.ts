@@ -8,6 +8,9 @@ export interface OpenCodeSettings {
   projectDirectory: string;
   startupTimeout: number;
   defaultViewLocation: ViewLocation;
+  injectWorkspaceContext: boolean;
+  maxNotesInContext: number;
+  maxSelectionLength: number;
 }
 
 export const DEFAULT_SETTINGS: OpenCodeSettings = {
@@ -18,6 +21,9 @@ export const DEFAULT_SETTINGS: OpenCodeSettings = {
   projectDirectory: "",
   startupTimeout: 15000,
   defaultViewLocation: "sidebar",
+  injectWorkspaceContext: true,
+  maxNotesInContext: 20,
+  maxSelectionLength: 2000,
 };
 
 export const OPENCODE_VIEW_TYPE = "opencode-view";

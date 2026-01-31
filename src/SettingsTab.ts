@@ -125,6 +125,50 @@ export class OpenCodeSettingTab extends PluginSettingTab {
           })
       );
 
+    containerEl.createEl("h3", { text: "Workspace Context" });
+
+    new Setting(containerEl)
+      .setName("Inject workspace context")
+      .setDesc(
+        "Includes open note paths and selected text in OpenCode when the view is focused"
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.injectWorkspaceContext)
+          .onChange(async (value) => {
+            this.plugin.settings.injectWorkspaceContext = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Max notes in context")
+      .setDesc("Limit how many open notes are included")
+      .addSlider((slider) =>
+        slider
+          .setLimits(1, 50, 1)
+          .setValue(this.plugin.settings.maxNotesInContext)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.maxNotesInContext = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Max selection length")
+      .setDesc("Truncate selected text to avoid oversized context")
+      .addSlider((slider) =>
+        slider
+          .setLimits(500, 5000, 100)
+          .setValue(this.plugin.settings.maxSelectionLength)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.maxSelectionLength = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
     containerEl.createEl("h3", { text: "Server Status" });
 
     const statusContainer = containerEl.createDiv({ cls: "opencode-settings-status" });
