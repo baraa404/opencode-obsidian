@@ -53,6 +53,47 @@ bun run build  # Production build with type checking
 bun test       # Run tests
 ```
 
+## Release Process
+
+This project uses automated GitHub releases for distribution via BRAT.
+
+### Version Commands
+
+We use semantic versioning (semver) with the following commands:
+
+```bash
+bun run version:patch   # Bump patch version (0.1.0 -> 0.1.1) - bug fixes
+bun run version:minor   # Bump minor version (0.1.0 -> 0.2.0) - new features
+bun run version:major   # Bump major version (0.1.0 -> 1.0.0) - breaking changes
+```
+
+### How Releases Work
+
+1. When you run a version command:
+   - `package.json` version is bumped
+   - `manifest.json` is automatically synchronized via the `version` lifecycle script
+   - A git commit is created with both files
+   - A git tag is created (e.g., `v0.2.0`)
+   - The commit and tag are pushed to GitHub
+
+2. GitHub Actions automatically:
+   - Triggers on the new tag
+   - Builds the plugin
+   - Creates a GitHub release marked as "pre-release"
+   - Attaches `manifest.json`, `main.js`, and `styles.css`
+
+3. BRAT users automatically receive the update
+
+### Creating a Release
+
+```bash
+# After your changes are merged to main...
+bun run version:minor   # or patch/major as appropriate
+# That's it! The rest is automated.
+```
+
+**Important:** Always use the version commands - don't create tags manually or update version numbers by hand. The automation keeps `package.json` and `manifest.json` in sync.
+
 ## Before Submitting a PR
 
 1. Run `bun run build` to ensure type checking passes

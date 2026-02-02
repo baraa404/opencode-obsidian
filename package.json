@@ -1,12 +1,16 @@
 {
   "name": "obsidian-opencode",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Embed OpenCode AI assistant in Obsidian",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "bun run tsc -noEmit -skipLibCheck && bun run esbuild.config.mjs production",
-    "test": "bun test"
+    "test": "bun test",
+    "version": "bun run scripts/sync-manifest-version.ts && git add manifest.json",
+    "version:patch": "bun pm version patch && git push --follow-tags",
+    "version:minor": "bun pm version minor && git push --follow-tags",
+    "version:major": "bun pm version major && git push --follow-tags"
   },
   "keywords": [
     "obsidian",
