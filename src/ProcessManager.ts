@@ -1,8 +1,42 @@
 import { spawn, ChildProcess } from "child_process";
 import { homedir } from "os";
+import { existsSync } from "fs";
 import { OpenCodeSettings } from "./types";
 
 export type ProcessState = "stopped" | "starting" | "running" | "error";
+
+/**
+ * Attempts to find the OpenCode executable on the system.
+ * Checks common installation paths, especially for Linux npm global installs.
+ */
+function findOpenCodeExecutable(configuredPath: string): string {
+  // Expand tilde in path if present
+  const expandedPath = configuredPath.startsWith("~")
+    ? configuredPath.replace("~", homedir())
+    : configuredPath;
+
+  // If it's just "opencode", check common Linux npm installation paths first
+  if (expandedPath === "opencode" && process.platform === "linux") {
+    const commonPaths = [
+      // Common npm global installation paths on Linux
+      "/usr/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode",
+      "/usr/local/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode",
+      // User-level npm global installation
+      `${homedir()}/.npm-global/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode`,
+      `${homedir()}/.local/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode`,
+    ];
+
+    for (const path of commonPaths) {
+      if (existsSync(path)) {
+        console.log("[OpenCode] Found executable at:", path);
+        return path;
+      }
+    }
+  }
+
+  // Return the configured/expanded path
+  return expandedPath;
+}
 
 export class ProcessManager {
   private process: ChildProcess | null = null;
@@ -71,10 +105,8 @@ export class ProcessManager {
       projectDirectory: this.projectDirectory,
     });
 
-    // Expand tilde in path if present (defensive - should be expanded in settings)
-    const opencodePath = this.settings.opencodePath.startsWith("~")
-      ? this.settings.opencodePath.replace("~", homedir())
-      : this.settings.opencodePath;
+    // Find the OpenCode executable (with Linux-specific fallbacks)
+    const opencodePath = findOpenCodeExecutable(this.settings.opencodePath);
 
     this.process = spawn(
       opencodePath,
@@ -123,7 +155,11 @@ export class ProcessManager {
       this.process = null;
 
       if (err.code === "ENOENT") {
-        this.setError(`Executable not found at '${this.settings.opencodePath}'`);
+        let errorMsg = `Executable not found at '${opencodePath}'`;
+        if (process.platform === "linux" && this.settings.opencodePath === "opencode") {
+          errorMsg += ". On Linux, try setting the path to: /usr/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode";
+        }
+        this.setError(errorMsg);
       } else {
         this.setError(`Failed to start: ${err.message}`);
       }

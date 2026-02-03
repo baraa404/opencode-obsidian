@@ -187,4 +187,27 @@ describe("Path Validation Logic", () => {
       expect(opencodePath).toBe(testPath);
     });
   });
+
+  describe("Linux-specific path detection", () => {
+    test("recognizes common npm global paths on Linux", () => {
+      const commonLinuxPaths = [
+        "/usr/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode",
+        "/usr/local/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode",
+      ];
+      
+      for (const path of commonLinuxPaths) {
+        const expanded = expandTilde(path);
+        expect(expanded).toBe(path);
+        expect(expanded).toContain("opencode-linux-x64");
+      }
+    });
+
+    test("recognizes user-level npm paths on Linux", () => {
+      const userPath = `${homedir()}/.npm-global/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode`;
+      const expanded = expandTilde(userPath);
+      
+      expect(expanded).toContain(homedir());
+      expect(expanded).toContain("opencode-linux-x64");
+    });
+  });
 });
