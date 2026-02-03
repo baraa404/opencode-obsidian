@@ -2,6 +2,8 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -58,13 +60,26 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.tag }}"
             VERSION=${VERSION#v}
-          else
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
             VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            # Auto-generate version for push to main
+            COMMIT_COUNT=$(git rev-list --count HEAD)
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            VERSION="0.0.${COMMIT_COUNT}-auto.${TIMESTAMP}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION"
 
+      - name: Update manifest version for auto-release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          VERSION=${{ steps.get_version.outputs.version }}
+          jq --arg version "$VERSION" '.version = $version' manifest.json > manifest.tmp && mv manifest.tmp manifest.json
+          echo "Updated manifest.json to version: $VERSION"
+
       - name: Verify manifest version matches tag
+        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
         run: |
           MANIFEST_VERSION=$(jq -r '.version' manifest.json)
           TAG_VERSION=${{ steps.get_version.outputs.version }}
@@ -80,8 +95,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          name: ${{ steps.get_version.outputs.version }}
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', steps.get_version.outputs.version) || '' }}
+          name: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('Auto-release {0}', steps.get_version.outputs.version) || steps.get_version.outputs.version }}
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', steps.get_version.outputs.version) || github.event_name == 'push' && github.ref == 'refs/heads/main' && format('v{0}', steps.get_version.outputs.version) || '' }}
           prerelease: true
           generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
