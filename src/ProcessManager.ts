@@ -1,4 +1,5 @@
 import { spawn, ChildProcess } from "child_process";
+import { homedir } from "os";
 import { OpenCodeSettings } from "./types";
 
 export type ProcessState = "stopped" | "starting" | "running" | "error";
@@ -70,8 +71,13 @@ export class ProcessManager {
       projectDirectory: this.projectDirectory,
     });
 
+    // Expand tilde in path if present (defensive - should be expanded in settings)
+    const opencodePath = this.settings.opencodePath.startsWith("~")
+      ? this.settings.opencodePath.replace("~", homedir())
+      : this.settings.opencodePath;
+
     this.process = spawn(
-      this.settings.opencodePath,
+      opencodePath,
       [
         "serve",
         "--port",
