@@ -44,7 +44,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: |
           TAG="${{ github.event.inputs.tag }}"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
+          if git show-ref --tags "$TAG" >/dev/null 2>&1; then
             echo "Checking out existing tag: $TAG"
             git checkout "$TAG"
           else
@@ -81,7 +81,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           name: ${{ steps.get_version.outputs.version }}
-          tag_name: v${{ steps.get_version.outputs.version }}
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', steps.get_version.outputs.version) || '' }}
           prerelease: true
           generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
