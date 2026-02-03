@@ -80,17 +80,25 @@ bun run version:major   # Bump major version (0.1.0 -> 1.0.0) - breaking changes
    - Triggers on the new tag
    - Builds the plugin
    - Creates a GitHub release marked as "pre-release"
+   - Generates release notes from recent commits
    - Attaches `manifest.json`, `main.js`, and `styles.css`
 
 3. BRAT users automatically receive the update
 
 ### Creating a Release
 
+**Automatic (Recommended):**
 ```bash
 # After your changes are merged to main...
 bun run version:minor   # or patch/major as appropriate
 # That's it! The rest is automated.
 ```
+
+**Manual (if needed):**
+You can also trigger a release manually from GitHub Actions:
+1. Go to Actions → Release workflow
+2. Click "Run workflow"
+3. Enter the version tag (e.g., `v0.1.0`)
 
 **Important:** Always use the version commands - don't create tags manually or update version numbers by hand. The automation keeps `package.json` and `manifest.json` in sync.
 
