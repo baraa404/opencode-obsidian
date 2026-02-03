@@ -34,6 +34,12 @@ function findOpenCodeExecutable(configuredPath: string): string {
     }
   }
 
+  // For absolute paths, verify they exist before returning
+  if (expandedPath !== "opencode" && !existsSync(expandedPath)) {
+    console.warn(`[OpenCode] Configured path does not exist: ${expandedPath}`);
+    console.warn("[OpenCode] Will attempt to use it anyway - spawn will handle the error");
+  }
+
   // Return the configured/expanded path
   return expandedPath;
 }
@@ -97,16 +103,17 @@ export class ProcessManager {
       return true;
     }
 
+    // Find the OpenCode executable (with Linux-specific fallbacks)
+    const opencodePath = findOpenCodeExecutable(this.settings.opencodePath);
+
     console.log("[OpenCode] Starting server:", {
       opencodePath: this.settings.opencodePath,
+      resolvedPath: opencodePath,
       port: this.settings.port,
       hostname: this.settings.hostname,
       cwd: this.projectDirectory,
       projectDirectory: this.projectDirectory,
     });
-
-    // Find the OpenCode executable (with Linux-specific fallbacks)
-    const opencodePath = findOpenCodeExecutable(this.settings.opencodePath);
 
     this.process = spawn(
       opencodePath,
@@ -156,7 +163,7 @@ export class ProcessManager {
 
       if (err.code === "ENOENT") {
         let errorMsg = `Executable not found at '${opencodePath}'`;
-        if (process.platform === "linux" && this.settings.opencodePath === "opencode") {
+        if (process.platform === "linux") {
           errorMsg += ". On Linux, try: 1) Run 'npm list -g opencode-ai' to find installation path, or 2) Set the full path in plugin settings (e.g., /usr/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode)";
         }
         this.setError(errorMsg);
