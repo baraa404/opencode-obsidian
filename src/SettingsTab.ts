@@ -67,9 +67,14 @@ export class OpenCodeSettingTab extends PluginSettingTab {
         text
           .setPlaceholder("opencode")
           .setValue(this.plugin.settings.opencodePath)
-          .onChange(async (value) => {
-            this.plugin.settings.opencodePath = value || "opencode";
-            await this.plugin.saveSettings();
+          .onChange((value) => {
+            // Debounce validation to avoid spamming notices on every keypress
+            if (this.validateTimeout) {
+              clearTimeout(this.validateTimeout);
+            }
+            this.validateTimeout = setTimeout(async () => {
+              await this.validateAndSetOpenCodePath(value);
+            }, 500);
           })
       );
 
@@ -208,6 +213,44 @@ export class OpenCodeSettingTab extends PluginSettingTab {
     }
 
     await this.plugin.updateProjectDirectory(expanded);
+  }
+
+  private async validateAndSetOpenCodePath(value: string): Promise<void> {
+    const trimmed = value.trim();
+
+    // Empty or just "opencode" is valid - means it's in PATH
+    if (!trimmed || trimmed === "opencode") {
+      this.plugin.settings.opencodePath = trimmed || "opencode";
+      await this.plugin.saveSettings();
+      return;
+    }
+
+    // Expand tilde for absolute paths
+    const expanded = expandTilde(trimmed);
+
+    try {
+      if (!existsSync(expanded)) {
+        new Notice("OpenCode executable not found at specified path");
+        return;
+      }
+      const stat = statSync(expanded);
+      if (!stat.isFile()) {
+        new Notice("OpenCode path must point to an executable file");
+        return;
+      }
+      // Check if executable (check mode for execute permission)
+      // On Unix: mode & 0o111 checks if any execute bit is set
+      if (process.platform !== "win32" && !(stat.mode & 0o111)) {
+        new Notice("OpenCode file is not executable. Run: chmod +x " + expanded);
+        return;
+      }
+    } catch (error) {
+      new Notice(`Failed to validate OpenCode path: ${(error as Error).message}`);
+      return;
+    }
+
+    this.plugin.settings.opencodePath = expanded;
+    await this.plugin.saveSettings();
   }
 
   private renderServerStatus(container: HTMLElement): void {
