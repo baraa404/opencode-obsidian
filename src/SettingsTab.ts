@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, Notice } from "obsidian";
+import { App, PluginSettingTab, Setting, Notice, TextComponent } from "obsidian";
 import { existsSync, statSync } from "fs";
 import { homedir } from "os";
 import type OpenCodePlugin from "./main";
@@ -17,8 +17,8 @@ function expandTilde(path: string): string {
 export class OpenCodeSettingTab extends PluginSettingTab {
   plugin: OpenCodePlugin;
   private validateTimeout: ReturnType<typeof setTimeout> | null = null;
-  private openCodePathText: any = null;
-  private projectDirectoryText: any = null;
+  private openCodePathText: TextComponent | null = null;
+  private projectDirectoryText: TextComponent | null = null;
 
   constructor(app: App, plugin: OpenCodePlugin) {
     super(app, plugin);
