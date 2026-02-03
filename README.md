@@ -69,6 +69,27 @@ Currently, this is work-in-progress feature with some limitations:
 
 <img src="./assets/plugin_settings.png" alt="Available plugin settings" />
 
+## Troubleshooting
+
+### Linux: OpenCode executable not found
+
+If you encounter "Executable not found" errors on Linux, the plugin will automatically check common npm installation paths:
+- `/usr/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode`
+- `/usr/local/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode`
+- `~/.npm-global/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode`
+- `~/.local/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode`
+
+You can also manually set the full path in plugin settings under "OpenCode path".
+
+To find your OpenCode installation:
+```bash
+# If installed globally via npm
+npm list -g opencode-ai
+
+# Check the actual binary location
+ls -la /usr/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode
+```
+
 ## Releases
 
 This plugin uses automated GitHub releases. Once the first version is tagged using `bun run version:patch` (or minor/major), all future releases will be created automatically when version tags are pushed to the repository. 
