@@ -103,6 +103,9 @@ export class ProcessManager {
       return true;
     }
 
+    // Find the OpenCode executable (with Linux-specific fallbacks)
+    const opencodePath = findOpenCodeExecutable(this.settings.opencodePath);
+
     console.log("[OpenCode] Starting server:", {
       opencodePath: this.settings.opencodePath,
       resolvedPath: opencodePath,
@@ -111,9 +114,6 @@ export class ProcessManager {
       cwd: this.projectDirectory,
       projectDirectory: this.projectDirectory,
     });
-
-    // Find the OpenCode executable (with Linux-specific fallbacks)
-    const opencodePath = findOpenCodeExecutable(this.settings.opencodePath);
 
     this.process = spawn(
       opencodePath,
