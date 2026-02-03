@@ -157,7 +157,7 @@ export class ProcessManager {
       if (err.code === "ENOENT") {
         let errorMsg = `Executable not found at '${opencodePath}'`;
         if (process.platform === "linux" && this.settings.opencodePath === "opencode") {
-          errorMsg += ". On Linux, try setting the path to: /usr/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode";
+          errorMsg += ". On Linux, try: 1) Run 'npm list -g opencode-ai' to find installation path, or 2) Set the full path in plugin settings (e.g., /usr/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode)";
         }
         this.setError(errorMsg);
       } else {
