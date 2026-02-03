@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { writeFileSync, mkdirSync, chmodSync, rmSync, existsSync } from "fs";
+import { writeFileSync, mkdirSync, chmodSync, rmSync, existsSync, statSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
@@ -78,6 +78,22 @@ describe("Path Validation Logic", () => {
       
       expect(!trimmed || trimmed === "opencode").toBe(true);
     });
+
+    test("accepts npm global install path unchanged", () => {
+      const npmPath = "/usr/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64/bin/opencode";
+      const expanded = expandTilde(npmPath);
+      
+      // Absolute paths should not be modified (no tilde expansion)
+      expect(expanded).toBe(npmPath);
+    });
+
+    test("accepts /usr/local/bin path unchanged", () => {
+      const localPath = "/usr/local/bin/opencode";
+      const expanded = expandTilde(localPath);
+      
+      // Absolute paths should not be modified (no tilde expansion)
+      expect(expanded).toBe(localPath);
+    });
   });
 
   describe("File validation", () => {
@@ -98,7 +114,7 @@ describe("Path Validation Logic", () => {
         const expanded = expandTilde(executablePath);
         expect(existsSync(expanded)).toBe(true);
         
-        const stat = require("fs").statSync(expanded);
+        const stat = statSync(expanded);
         expect(stat.isFile()).toBe(true);
         
         // On Unix, check execute permission
@@ -123,7 +139,7 @@ describe("Path Validation Logic", () => {
       writeFileSync(nonExecPath, "#!/bin/bash\necho test", { mode: 0o644 });
       
       try {
-        const stat = require("fs").statSync(nonExecPath);
+        const stat = statSync(nonExecPath);
         expect(stat.isFile()).toBe(true);
         expect(stat.mode & 0o111).toBe(0);
       } finally {
@@ -138,7 +154,7 @@ describe("Path Validation Logic", () => {
       mkdirSync(dirPath, { recursive: true });
       
       try {
-        const stat = require("fs").statSync(dirPath);
+        const stat = statSync(dirPath);
         expect(stat.isFile()).toBe(false);
         expect(stat.isDirectory()).toBe(true);
       } finally {
