@@ -65,8 +65,9 @@ jobs:
           else
             # Auto-generate version for push to main
             COMMIT_COUNT=$(git rev-list --count HEAD)
-            TIMESTAMP=$(date +%Y%m%d%H%M%S)
-            VERSION="0.0.${COMMIT_COUNT}-auto.${TIMESTAMP}"
+            COMMIT_SHA=$(git rev-parse --short HEAD)
+            TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+            VERSION="0.0.${COMMIT_COUNT}-${COMMIT_SHA}.${TIMESTAMP}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION"
