@@ -99,6 +99,8 @@ You can also trigger a release manually from GitHub Actions:
 1. Go to Actions → Release workflow
 2. Click "Run workflow"
 3. Enter the version tag (e.g., `v0.1.0`)
+4. The workflow will check out the tag if it exists, or use current HEAD
+5. **Note**: The manifest.json version must match the tag version
 
 **Important:** Always use the version commands - don't create tags manually or update version numbers by hand. The automation keeps `package.json` and `manifest.json` in sync.
 

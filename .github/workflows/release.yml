@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -37,6 +39,18 @@ jobs:
 
       - name: Install dependencies
         run: bun install
+
+      - name: Checkout tag for manual dispatch
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Checking out existing tag: $TAG"
+            git checkout "$TAG"
+          else
+            echo "Tag $TAG does not exist. Using current HEAD."
+            echo "Release will be created from current commit."
+          fi
 
       - name: Extract version from tag
         id: get_version
