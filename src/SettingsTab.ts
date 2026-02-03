@@ -17,6 +17,8 @@ function expandTilde(path: string): string {
 export class OpenCodeSettingTab extends PluginSettingTab {
   plugin: OpenCodePlugin;
   private validateTimeout: ReturnType<typeof setTimeout> | null = null;
+  private openCodePathText: any = null;
+  private projectDirectoryText: any = null;
 
   constructor(app: App, plugin: OpenCodePlugin) {
     super(app, plugin);
@@ -63,7 +65,8 @@ export class OpenCodeSettingTab extends PluginSettingTab {
       .setDesc(
         "Path to the OpenCode executable. Leave as 'opencode' if it's in your PATH."
       )
-      .addText((text) =>
+      .addText((text) => {
+        this.openCodePathText = text;
         text
           .setPlaceholder("opencode")
           .setValue(this.plugin.settings.opencodePath)
@@ -75,15 +78,16 @@ export class OpenCodeSettingTab extends PluginSettingTab {
             this.validateTimeout = setTimeout(async () => {
               await this.validateAndSetOpenCodePath(value);
             }, 500);
-          })
-      );
+          });
+      });
 
     new Setting(containerEl)
       .setName("Project directory")
       .setDesc(
         "Override the starting directory for OpenCode. Leave empty to use the vault root. Supports ~ for home directory."
       )
-      .addText((text) =>
+      .addText((text) => {
+        this.projectDirectoryText = text;
         text
           .setPlaceholder("/path/to/project or ~/project")
           .setValue(this.plugin.settings.projectDirectory)
@@ -95,8 +99,8 @@ export class OpenCodeSettingTab extends PluginSettingTab {
             this.validateTimeout = setTimeout(async () => {
               await this.validateAndSetProjectDirectory(value);
             }, 500);
-          })
-      );
+          });
+      });
 
     containerEl.createEl("h3", { text: "Behavior" });
 
@@ -186,12 +190,17 @@ export class OpenCodeSettingTab extends PluginSettingTab {
     // Empty value is valid - means use vault root
     if (!trimmed) {
       await this.plugin.updateProjectDirectory("");
+      new Notice("Project directory reset to vault root");
       return;
     }
 
     // Validate absolute path (supports ~, /, and Windows drive letters)
     if (!trimmed.startsWith("/") && !trimmed.startsWith("~") && !trimmed.match(/^[A-Za-z]:\\/)) {
-      new Notice("Project directory must be an absolute path (or start with ~)");
+      new Notice("❌ Project directory must be an absolute path (or start with ~)");
+      // Reset to saved value
+      if (this.projectDirectoryText) {
+        this.projectDirectoryText.setValue(this.plugin.settings.projectDirectory);
+      }
       return;
     }
 
@@ -199,20 +208,33 @@ export class OpenCodeSettingTab extends PluginSettingTab {
 
     try {
       if (!existsSync(expanded)) {
-        new Notice("Project directory does not exist");
+        new Notice(`❌ Directory does not exist: ${expanded}`);
+        // Reset to saved value
+        if (this.projectDirectoryText) {
+          this.projectDirectoryText.setValue(this.plugin.settings.projectDirectory);
+        }
         return;
       }
       const stat = statSync(expanded);
       if (!stat.isDirectory()) {
-        new Notice("Project directory path is not a directory");
+        new Notice(`❌ Path is not a directory: ${expanded}`);
+        // Reset to saved value
+        if (this.projectDirectoryText) {
+          this.projectDirectoryText.setValue(this.plugin.settings.projectDirectory);
+        }
         return;
       }
     } catch (error) {
-      new Notice(`Failed to validate path: ${(error as Error).message}`);
+      new Notice(`❌ Failed to validate path: ${(error as Error).message}`);
+      // Reset to saved value
+      if (this.projectDirectoryText) {
+        this.projectDirectoryText.setValue(this.plugin.settings.projectDirectory);
+      }
       return;
     }
 
     await this.plugin.updateProjectDirectory(expanded);
+    new Notice(`✓ Project directory set to: ${expanded}`);
   }
 
   private async validateAndSetOpenCodePath(value: string): Promise<void> {
@@ -222,6 +244,7 @@ export class OpenCodeSettingTab extends PluginSettingTab {
     if (!trimmed || trimmed === "opencode") {
       this.plugin.settings.opencodePath = trimmed || "opencode";
       await this.plugin.saveSettings();
+      new Notice("OpenCode path updated successfully");
       return;
     }
 
@@ -230,27 +253,44 @@ export class OpenCodeSettingTab extends PluginSettingTab {
 
     try {
       if (!existsSync(expanded)) {
-        new Notice("OpenCode executable not found at specified path");
+        new Notice(`❌ OpenCode executable not found at: ${expanded}`);
+        // Reset to saved value
+        if (this.openCodePathText) {
+          this.openCodePathText.setValue(this.plugin.settings.opencodePath);
+        }
         return;
       }
       const stat = statSync(expanded);
       if (!stat.isFile()) {
-        new Notice("OpenCode path must point to an executable file");
+        new Notice(`❌ Path must point to a file, not a directory: ${expanded}`);
+        // Reset to saved value
+        if (this.openCodePathText) {
+          this.openCodePathText.setValue(this.plugin.settings.opencodePath);
+        }
         return;
       }
       // Check if executable (check mode for execute permission)
       // On Unix: mode & 0o111 checks if any execute bit is set
       if (process.platform !== "win32" && !(stat.mode & 0o111)) {
-        new Notice("OpenCode file is not executable. Run: chmod +x " + expanded);
+        new Notice(`❌ File is not executable. Run: chmod +x ${expanded}`);
+        // Reset to saved value
+        if (this.openCodePathText) {
+          this.openCodePathText.setValue(this.plugin.settings.opencodePath);
+        }
         return;
       }
     } catch (error) {
-      new Notice(`Failed to validate OpenCode path: ${(error as Error).message}`);
+      new Notice(`❌ Failed to validate path: ${(error as Error).message}`);
+      // Reset to saved value
+      if (this.openCodePathText) {
+        this.openCodePathText.setValue(this.plugin.settings.opencodePath);
+      }
       return;
     }
 
     this.plugin.settings.opencodePath = expanded;
     await this.plugin.saveSettings();
+    new Notice(`✓ OpenCode path set to: ${expanded}`);
   }
 
   private renderServerStatus(container: HTMLElement): void {
